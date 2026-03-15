@@ -7,6 +7,7 @@ import {
   verifyRefreshToken,
 } from "../utils/jwt.utils.js";
 import { successResponse, errorResponse } from "../utils/apiResponse.js";
+import User from "../models/User.model.js";
 
 // ── POST /api/v1/auth/send-otp ───────────────
 export const sendOTP = async (req, res) => {
@@ -89,13 +90,22 @@ export const verifyOTPHandler = async (req, res) => {
     // Delete OTP from Redis after successful verify
     await redis.del(otpKey);
 
+    // Find or create user in MongoDB
+    let user = await User.findOne({ phone });
+    let isNewUser = false;
+
+    if (!user) {
+      user = await User.create({ phone });
+      isNewUser = true;
+      console.log(`✅ New user created: ${phone}`);
+    }
+
     // Generate JWT tokens
-    // For now use phone as userId — Day 04 we replace with real user._id
-    const accessToken = generateAccessToken(phone);
-    const refreshToken = generateRefreshToken(phone);
+    const accessToken = generateAccessToken(user._id.toString());
+    const refreshToken = generateRefreshToken(user._id.toString());
 
     // Store refresh token in Redis with 30 day expiry
-    const refreshKey = `refresh:${phone}`;
+    const refreshKey = `refresh:${user._id}`;
     await redis.set(refreshKey, refreshToken, { ex: 30 * 24 * 60 * 60 });
 
     return successResponse(
@@ -104,7 +114,13 @@ export const verifyOTPHandler = async (req, res) => {
       {
         accessToken,
         refreshToken,
-        isNewUser: true, // Day 04 → check if user exists in DB
+        isNewUser,
+        user: {
+          _id: user._id,
+          phone: user.phone,
+          isVerified: user.isVerified,
+          completenessScore: user.completenessScore,
+        },
       },
       "OTP verified successfully",
     );
@@ -122,20 +138,33 @@ export const refreshToken = async (req, res) => {
       return errorResponse(res, 400, "Refresh token required");
     }
 
-    // Verify refresh token
+    // verify refresh token signature
     const decoded = verifyRefreshToken(refreshToken);
-    const phone = decoded.userId;
+    const userId = decoded.userId; // ← rename phone to userId ✅
 
-    // Check if refresh token exists in Redis
-    const refreshKey = `refresh:${phone}`;
+    // check if refresh token exists in Redis
+    // key was stored as refresh:userId in verifyOTPHandler
+    const refreshKey = `refresh:${userId}`; // ← now matches correctly ✅
     const storedToken = await redis.get(refreshKey);
 
-    if (!storedToken || storedToken !== refreshToken) {
-      return errorResponse(res, 401, "Invalid or expired refresh token");
+    if (!storedToken) {
+      return errorResponse(
+        res,
+        401,
+        "Refresh token not found. Please login again",
+      );
     }
 
-    // Generate new access token
-    const newAccessToken = generateAccessToken(phone);
+    if (storedToken !== refreshToken) {
+      return errorResponse(
+        res,
+        401,
+        "Invalid refresh token. Please login again",
+      );
+    }
+
+    // generate new access token using userId
+    const newAccessToken = generateAccessToken(userId); // ← userId not phone ✅
 
     return successResponse(
       res,
@@ -146,6 +175,13 @@ export const refreshToken = async (req, res) => {
       "Token refreshed successfully",
     );
   } catch (error) {
+    if (error.name === "TokenExpiredError") {
+      return errorResponse(
+        res,
+        401,
+        "Refresh token expired. Please login again",
+      );
+    }
     return errorResponse(res, 401, "Invalid refresh token");
   }
 };
@@ -153,14 +189,14 @@ export const refreshToken = async (req, res) => {
 // ── POST /api/v1/auth/logout ─────────────────
 export const logout = async (req, res) => {
   try {
-    const { phone } = req.body;
+    const { userId } = req.body;
 
-    if (!phone) {
-      return errorResponse(res, 400, "Phone number required");
+    if (!userId) {
+      return errorResponse(res, 400, "userId is required");
     }
 
-    // Delete refresh token from Redis
-    const refreshKey = `refresh:${phone}`;
+    // delete refresh token from Redis
+    const refreshKey = `refresh:${userId}`;
     await redis.del(refreshKey);
 
     return successResponse(res, 200, null, "Logged out successfully");

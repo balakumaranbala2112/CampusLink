@@ -5,7 +5,7 @@ const authMiddleware = (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
 
-    if (!authHeader || !authHeader.startswith("Bearer ")) {
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return errorResponse(res, 401, "Access token required");
     }
 

@@ -3,6 +3,7 @@ import cors from "cors";
 import helmet from "helmet";
 import collegeRoutes from "./src/routes/college.routes.js"; // ← ADD THIS
 import authRoutes from "./src/routes/auth.routes.js";
+import userRoutes from "./src/routes/user.routes.js";
 
 const app = express();
 
@@ -14,6 +15,7 @@ app.use(express.json());
 // ---- Routes -----
 app.use("/api/v1/colleges", collegeRoutes);
 app.use("/api/v1/auth", authRoutes);
+app.use("/api/v1/users", userRoutes);
 
 // ---- Health Check ----
 app.get("/health", (req, res) => {
