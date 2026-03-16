@@ -3,6 +3,7 @@ import http from "http";
 import app from "./app.js";
 import connectDB from "./src/config/db.js";
 import { initializeSocket } from "./src/socket/socket.js";
+import { setSocketIO } from "./src/utils/notification.utils.js";
 
 const PORT = process.env.PORT || 5000;
 
@@ -16,7 +17,9 @@ const startServer = async () => {
   const server = http.createServer(app);
 
   // attach Socket.io to the HTTP server
-  initializeSocket(server);
+  const { io, onlineUsers } = initializeSocket(server);
+
+  setSocketIO(io, onlineUsers);
   // start listening on PORT
   // server handles BOTH HTTP requests AND Socket.io connections
   server.listen(PORT, () => {

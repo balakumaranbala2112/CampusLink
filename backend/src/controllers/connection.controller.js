@@ -2,6 +2,7 @@ import Connection from "../models/Connection.model.js";
 import User from "../models/User.model.js";
 import redis from "../config/redis.js";
 import { successResponse, errorResponse } from "../utils/apiResponse.js";
+import { createNotification } from "../utils/notification.utils.js";
 
 // ── POST /api/v1/connections/request
 
@@ -73,6 +74,15 @@ export const sendRequest = async (req, res) => {
   }
 };
 
+// notify receiver about connection request
+await createNotification({
+  recipientId: receiverId,
+  senderId: requesterId,
+  type: "connection_request",
+  message: "sent you a connection request",
+  link: "/connections",
+});
+
 // ── POST /api/v1/connections/accept
 
 export const acceptRequest = async (req, res) => {
@@ -100,6 +110,15 @@ export const acceptRequest = async (req, res) => {
     errorResponse(res, 500, error.message);
   }
 };
+
+// notify requester their request was accepted
+await createNotification({
+  recipientId: connection.requester.toString(),
+  senderId: req.userId,
+  type: "connection_accept",
+  message: "accepted your connection request",
+  link: "/connections",
+});
 
 // ── POST /api/v1/connections/decline
 

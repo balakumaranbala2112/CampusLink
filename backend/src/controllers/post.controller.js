@@ -1,5 +1,6 @@
 import Post from "../models/Post.model.js";
 import { successResponse, errorResponse } from "../utils/apiResponse.js";
+import { createNotification } from "../utils/notification.utils.js";
 
 // ---- POST /api/v1/posts ----
 export const createPost = async (req, res) => {
@@ -89,6 +90,17 @@ export const toggleLike = async (req, res) => {
   }
 };
 
+// notify post author when someone likes (not when unliking)
+if (!alreadyLiked && post.author.toString() !== req.userId) {
+  await createNotification({
+    recipientId: post.author.toString(),
+    senderId: req.userId,
+    type: "post_like",
+    message: "liked your post",
+    link: `/posts/${post._id}`,
+  });
+}
+
 // ---- POST /api/v1/posts/:id/comment ----
 export const addComment = async (req, res) => {
   try {
@@ -111,6 +123,17 @@ export const addComment = async (req, res) => {
     });
 
     await post.save();
+
+    // notify post author when someone comments
+    if (post.author.toString() !== req.userId) {
+      await createNotification({
+        recipientId: post.author.toString(),
+        senderId: req.userId,
+        type: "post_comment",
+        message: "commented on your post",
+        link: `/posts/${post._id}`,
+      });
+    }
 
     await post.populate("comments.user", "name profilePhoto");
 
