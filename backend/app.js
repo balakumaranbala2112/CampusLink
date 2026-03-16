@@ -7,6 +7,7 @@ import userRoutes from "./src/routes/user.routes.js";
 import connectionRoutes from "./src/routes/connection.routes.js";
 import postRoutes from "./src/routes/post.routes.js";
 import feedRoutes from "./src/routes/feed.routes.js";
+import uploadRoutes from "./src/routes/upload.routes.js";
 
 const app = express();
 
@@ -22,6 +23,7 @@ app.use("/api/v1/users", userRoutes);
 app.use("/api/v1/connections", connectionRoutes);
 app.use("/api/v1/posts", postRoutes);
 app.use("/api/v1/feed", feedRoutes);
+app.use("/api/v1/upload", uploadRoutes);
 
 // ---- Health Check ----
 app.get("/health", (req, res) => {
