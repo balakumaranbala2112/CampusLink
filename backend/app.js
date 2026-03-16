@@ -8,6 +8,7 @@ import connectionRoutes from "./src/routes/connection.routes.js";
 import postRoutes from "./src/routes/post.routes.js";
 import feedRoutes from "./src/routes/feed.routes.js";
 import uploadRoutes from "./src/routes/upload.routes.js";
+import messageRoutes from "./src/routes/message.routes.js";
 
 const app = express();
 
@@ -24,6 +25,7 @@ app.use("/api/v1/connections", connectionRoutes);
 app.use("/api/v1/posts", postRoutes);
 app.use("/api/v1/feed", feedRoutes);
 app.use("/api/v1/upload", uploadRoutes);
+app.use("/api/v1/messages", messageRoutes);
 
 // ---- Health Check ----
 app.get("/health", (req, res) => {
