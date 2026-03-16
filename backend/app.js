@@ -5,6 +5,8 @@ import collegeRoutes from "./src/routes/college.routes.js";
 import authRoutes from "./src/routes/auth.routes.js";
 import userRoutes from "./src/routes/user.routes.js";
 import connectionRoutes from "./src/routes/connection.routes.js";
+import postRoutes from "./src/routes/post.routes.js";
+import feedRoutes from "./src/routes/feed.routes.js";
 
 const app = express();
 
@@ -18,6 +20,8 @@ app.use("/api/v1/colleges", collegeRoutes);
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/users", userRoutes);
 app.use("/api/v1/connections", connectionRoutes);
+app.use("/api/v1/posts", postRoutes);
+app.use("/api/v1/feed", feedRoutes);
 
 // ---- Health Check ----
 app.get("/health", (req, res) => {
