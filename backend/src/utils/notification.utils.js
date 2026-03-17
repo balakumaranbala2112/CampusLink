@@ -1,24 +1,20 @@
 import Notification from "../models/Notification.model.js";
 
-// module level variable to store io instance
 let io;
-// module level variable to store online users map
 let onlineUsersMap;
 
-// called once in server.js to store io and onlineUsers
 export const setSocketIO = (socketIO, onlineUsers) => {
   io = socketIO;
   onlineUsersMap = onlineUsers;
 };
 
 // ── Create and Send Notification ─────────────
-// called from controllers whenever something happens
 export const createNotification = async ({
-  recipientId, // who gets the notification
-  senderId, // who triggered it
-  type, // what type
-  message, // what to say
-  link, // where to go when clicked
+  recipientId,
+  senderId,
+  type,
+  message,
+  link,
 }) => {
   try {
     // Step 1 — save to MongoDB

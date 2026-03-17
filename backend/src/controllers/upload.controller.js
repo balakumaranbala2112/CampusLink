@@ -1,4 +1,4 @@
-import cloudinary from "../config/cloudinary";
+import cloudinary from "../config/cloudinary.js";
 import User from "../models/User.model.js";
 import { successResponse, errorResponse } from "../utils/apiResponse.js";
 import uploadToCloudinary from "../utils/uploadToCloudinary.js";

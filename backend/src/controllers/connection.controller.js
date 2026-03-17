@@ -69,19 +69,18 @@ export const sendRequest = async (req, res) => {
     }
 
     return successResponse(res, 200, connection, "Connection request sent");
+    // notify receiver about connection request
+    await createNotification({
+      recipientId: receiverId,
+      senderId: requesterId,
+      type: "connection_request",
+      message: "sent you a connection request",
+      link: "/connections",
+    });
   } catch (error) {
     return errorResponse(res, 500, errorResponse);
   }
 };
-
-// notify receiver about connection request
-await createNotification({
-  recipientId: receiverId,
-  senderId: requesterId,
-  type: "connection_request",
-  message: "sent you a connection request",
-  link: "/connections",
-});
 
 // ── POST /api/v1/connections/accept
 
@@ -106,19 +105,19 @@ export const acceptRequest = async (req, res) => {
     connection.status = "accepted";
 
     await connection.save();
+
+    // notify requester their request was accepted
+    await createNotification({
+      recipientId: connection.requester.toString(),
+      senderId: req.userId,
+      type: "connection_accept",
+      message: "accepted your connection request",
+      link: "/connections",
+    });
   } catch (error) {
     errorResponse(res, 500, error.message);
   }
 };
-
-// notify requester their request was accepted
-await createNotification({
-  recipientId: connection.requester.toString(),
-  senderId: req.userId,
-  type: "connection_accept",
-  message: "accepted your connection request",
-  link: "/connections",
-});
 
 // ── POST /api/v1/connections/decline
 

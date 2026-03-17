@@ -76,6 +76,17 @@ export const toggleLike = async (req, res) => {
     }
     await post.save();
 
+    // notify post author when someone likes (not when unliking)
+    if (!alreadyLiked && post.author.toString() !== req.userId) {
+      await createNotification({
+        recipientId: post.author.toString(),
+        senderId: req.userId,
+        type: "post_like",
+        message: "liked your post",
+        link: `/posts/${post._id}`,
+      });
+    }
+
     return successResponse(
       res,
       200,
@@ -89,17 +100,6 @@ export const toggleLike = async (req, res) => {
     return errorResponse(res, 500, error.message);
   }
 };
-
-// notify post author when someone likes (not when unliking)
-if (!alreadyLiked && post.author.toString() !== req.userId) {
-  await createNotification({
-    recipientId: post.author.toString(),
-    senderId: req.userId,
-    type: "post_like",
-    message: "liked your post",
-    link: `/posts/${post._id}`,
-  });
-}
 
 // ---- POST /api/v1/posts/:id/comment ----
 export const addComment = async (req, res) => {
