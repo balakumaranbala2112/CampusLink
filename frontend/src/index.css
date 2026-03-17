@@ -1,0 +1,42 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@import "tailwindcss";
+
+@theme {
+  /* campusLink Brand Colors */
+  --color-primary-50:  #EBF5FB;
+  --color-primary-100: #D6EAF8;
+  --color-primary-500: #2E86C1;
+  --color-primary-600: #1A56DB;
+  --color-primary-700: #1641B0;
+  --color-primary-900: #0F2E8A;
+
+  --color-secondary-500: #0E9F6E;
+  --color-secondary-600: #057A55;
+
+  --color-accent-500: #7E3AF2;
+  --color-accent-600: #6C2BD9;
+
+  --color-campus-dark:    #111928;
+  --color-campus-mid:     #374151;
+  --color-campus-muted:   #6B7280;
+  --color-campus-surface: #F9FAFB;
+  --color-campus-border:  #E5E7EB;
+
+  /* Font */
+  --font-sans: 'Inter', sans-serif;
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    background-color: var(--color-campus-surface);
+    color: var(--color-campus-mid);
+  }
+}
