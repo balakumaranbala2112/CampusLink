@@ -1,9 +1,9 @@
-import bcrypt from "bcryptjs";
 import redis from "../config/redis.js";
 import { generateOTP, hashOTP, verifyOTP } from "../utils/otp.utils.js";
 import {
   generateAccessToken,
   generateRefreshToken,
+  verifyAccessToken,
   verifyRefreshToken,
 } from "../utils/jwt.utils.js";
 import { successResponse, errorResponse } from "../utils/apiResponse.js";
@@ -37,8 +37,9 @@ export const sendOTP = async (req, res) => {
 
     // Store hashed OTP in Redis with 10 min expiry
     const otpKey = `otp:${phone}`;
+
     await redis.set(otpKey, hashedOTP, {
-      ex: parseInt(process.env.OTP_EXPIRY_SECONDS),
+      ex: parseInt(process.env.OTP_EXPIRY_SECONDS) || 600,
     });
 
     // Increment rate limit counter
@@ -50,7 +51,7 @@ export const sendOTP = async (req, res) => {
 
     // In production → send OTP via MSG91/Twilio
     // For development → log to console
-    console.log(`📱 OTP for ${phone}: ${otp}`);
+    console.log(`OTP for ${phone}: ${otp}`);
 
     return successResponse(res, 200, null, `OTP sent successfully to ${phone}`);
   } catch (error) {
@@ -97,7 +98,7 @@ export const verifyOTPHandler = async (req, res) => {
     if (!user) {
       user = await User.create({ phone });
       isNewUser = true;
-      console.log(`✅ New user created: ${phone}`);
+      console.log(`New user created: ${phone}`);
     }
 
     // Generate JWT tokens
@@ -124,8 +125,8 @@ export const verifyOTPHandler = async (req, res) => {
       },
       "OTP verified successfully",
     );
-  } catch (error) {
-    return errorResponse(res, 500, error.message);
+  } catch (e) {
+    return errorResponse(res, 500, "Internal server error");
   }
 };
 
@@ -140,11 +141,12 @@ export const refreshToken = async (req, res) => {
 
     // verify refresh token signature
     const decoded = verifyRefreshToken(refreshToken);
-    const userId = decoded.userId; // ← rename phone to userId ✅
+    console.log(decoded);
+
+    const userId = decoded.userId;
 
     // check if refresh token exists in Redis
-    // key was stored as refresh:userId in verifyOTPHandler
-    const refreshKey = `refresh:${userId}`; // ← now matches correctly ✅
+    const refreshKey = `refresh:${userId}`;
     const storedToken = await redis.get(refreshKey);
 
     if (!storedToken) {
@@ -164,7 +166,7 @@ export const refreshToken = async (req, res) => {
     }
 
     // generate new access token using userId
-    const newAccessToken = generateAccessToken(userId); // ← userId not phone ✅
+    const newAccessToken = generateAccessToken(userId);
 
     return successResponse(
       res,
@@ -189,11 +191,15 @@ export const refreshToken = async (req, res) => {
 // ── POST /api/v1/auth/logout ─────────────────
 export const logout = async (req, res) => {
   try {
-    const { userId } = req.body;
+    const authHeader = req.headers.authorization;
 
-    if (!userId) {
-      return errorResponse(res, 400, "userId is required");
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return errorResponse(res, 401, "Unauthorized");
     }
+
+    const token = authHeader.split(" ")[1];
+    const decoded = verifyAccessToken(token);
+    const userId = decoded.userId;
 
     // delete refresh token from Redis
     const refreshKey = `refresh:${userId}`;
