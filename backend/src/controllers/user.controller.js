@@ -1,14 +1,14 @@
 import User from "../models/User.model.js";
-import College from "../models/College.model.js";
+import College from "../models/college.model.js";
 import { successResponse, errorResponse } from "../utils/apiResponse.js";
 
 // ── GET /api/v1/users/me
 export const getMyProfile = async (req, res) => {
   try {
-    const user = await User.findById(req.userId).populate(
-      "college",
-      "name city state",
-    );
+    const user = await User.findById(req.userId)
+      .select("phone college isVerified completenessScore")
+      .populate("college", "name city state")
+      .lean();
 
     if (!user) {
       return errorResponse(res, 404, "User not found");
@@ -21,7 +21,6 @@ export const getMyProfile = async (req, res) => {
 };
 
 // ── PATCH /api/v1/users/me
-
 export const updateMyProfile = async (req, res) => {
   try {
     const allowedFields = [
@@ -68,13 +67,13 @@ export const updateMyProfile = async (req, res) => {
 };
 
 // ── GET /api/v1/users/:id
-
 export const getUserById = async (req, res) => {
   try {
     const user = await User.findById(req.params.id)
       .populate("college", "name city state")
-      .select("-__v");
-
+      .select("-__v -phone")
+      .lean();
+      
     if (!user) {
       return errorResponse(res, 404, "User not found");
     }

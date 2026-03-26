@@ -198,12 +198,16 @@ export const logout = async (req, res) => {
     }
 
     const token = authHeader.split(" ")[1];
+
     const decoded = verifyAccessToken(token);
     const userId = decoded.userId;
 
-    // delete refresh token from Redis
     const refreshKey = `refresh:${userId}`;
+    
     await redis.del(refreshKey);
+    await redis.set(`blacklist:${token}`, "true", {
+      ex: 15 * 60,
+    });
 
     return successResponse(res, 200, null, "Logged out successfully");
   } catch (error) {

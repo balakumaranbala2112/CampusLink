@@ -38,7 +38,6 @@ export const uploadProfilePhoto = async (req, res) => {
 };
 
 // ---- POST /api/v1/upload/post-image ----
-
 export const uploadPostImage = async (req, res) => {
   try {
     if (!req.file) {

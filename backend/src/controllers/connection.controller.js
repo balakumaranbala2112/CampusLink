@@ -4,23 +4,26 @@ import redis from "../config/redis.js";
 import { successResponse, errorResponse } from "../utils/apiResponse.js";
 import { createNotification } from "../utils/notification.utils.js";
 
-// ── POST /api/v1/connections/request
-
+// # POST /api/v1/connections/request
 export const sendRequest = async (req, res) => {
   try {
     const { receiverId } = req.body;
     const requesterId = req.userId;
+
+    if (!receiverId) {
+      return errorResponse(res, 400, "Receiver ID required");
+    }
 
     if (requesterId === receiverId) {
       return errorResponse(res, 400, "You cannot connect with yourself");
     }
 
     const receiver = await User.findById(receiverId);
-
     if (!receiver) {
       return errorResponse(res, 404, "User not found");
     }
 
+    //  Rate limit
     const dailyKey = `conn_limit:${requesterId}`;
     const dailyCount = await redis.get(dailyKey);
 
@@ -32,14 +35,13 @@ export const sendRequest = async (req, res) => {
       );
     }
 
-    const existing = await Connection.findOne({
-      $or: [
-        { requester: requesterId, receiver: receiverId },
-        { requester: receiverId, receiver: requesterId },
-      ],
-    });
+    const participants = [requesterId, receiverId].sort();
+
+    let existing = await Connection.findOne({ participants });
 
     if (existing) {
+      console.log(existing); // TEST PURPOSE
+
       if (existing.status === "pending") {
         return errorResponse(res, 400, "Connection request already sent");
       }
@@ -52,7 +54,9 @@ export const sendRequest = async (req, res) => {
         existing.status = "pending";
         existing.requester = requesterId;
         existing.receiver = receiverId;
+
         await existing.save();
+
         return successResponse(res, 201, existing, "Connection request sent");
       }
     }
@@ -60,15 +64,18 @@ export const sendRequest = async (req, res) => {
     const connection = await Connection.create({
       requester: requesterId,
       receiver: receiverId,
+      participants,
     });
 
     if (!dailyCount) {
       await redis.set(dailyKey, "1", { ex: 24 * 60 * 60 });
     } else {
-      await redis.incr(dailyKey);
-    }
+      const count = await redis.incr(dailyKey);
 
-    return successResponse(res, 200, connection, "Connection request sent");
+      if (count === 1) {
+        await redis.expire(dailyKey, 86400);
+      }
+    }
     // notify receiver about connection request
     await createNotification({
       recipientId: receiverId,
@@ -77,13 +84,17 @@ export const sendRequest = async (req, res) => {
       message: "sent you a connection request",
       link: "/connections",
     });
+
+    return successResponse(res, 200, connection, "Connection request sent");
   } catch (error) {
-    return errorResponse(res, 500, errorResponse);
+    if (error.code === 11000) {
+      return errorResponse(res, 400, "Connection already exists");
+    }
+    return errorResponse(res, 500, error.message);
   }
 };
 
-// ── POST /api/v1/connections/accept
-
+// # POST /api/v1/connections/accept
 export const acceptRequest = async (req, res) => {
   try {
     const { connectionId } = req.body;
@@ -103,10 +114,8 @@ export const acceptRequest = async (req, res) => {
     }
 
     connection.status = "accepted";
-
     await connection.save();
 
-    // notify requester their request was accepted
     await createNotification({
       recipientId: connection.requester.toString(),
       senderId: req.userId,
@@ -114,13 +123,14 @@ export const acceptRequest = async (req, res) => {
       message: "accepted your connection request",
       link: "/connections",
     });
+
+    return successResponse(res, 200, connection, "Connection accepted");
   } catch (error) {
     errorResponse(res, 500, error.message);
   }
 };
 
-// ── POST /api/v1/connections/decline
-
+// # POST /api/v1/connections/decline
 export const declineRequest = async (req, res) => {
   try {
     const { connectionId } = req.body;
@@ -143,22 +153,30 @@ export const declineRequest = async (req, res) => {
     connection.status = "declined";
     await connection.save();
 
+    await createNotification({
+      recipientId: connection.requester.toString(),
+      senderId: req.userId,
+      type: "connection_decline",
+      message: "declined your connection request",
+      link: "/connections",
+    });
+
     return successResponse(res, 200, null, "Request declined");
   } catch (error) {
     return errorResponse(res, 500, error.message);
   }
 };
 
-// ── GET /api/v1/connections/list
-
+// # GET /api/v1/connections/list
 export const getConnections = async (req, res) => {
   try {
     const connections = await Connection.find({
       $or: [{ requester: req.userId }, { receiver: req.userId }],
-      status: "Completed",
+      status: "accepted",
     })
       .populate("requester", "name profilePhoto college department")
-      .populate("receiver", "name profilePhoto college department");
+      .populate("receiver", "name profilePhoto college department")
+      .lean();
 
     const connectedUsers = connections.map((conn) => {
       const isRequester = conn.requester._id.toString() === req.userId;
@@ -167,26 +185,28 @@ export const getConnections = async (req, res) => {
         user: isRequester ? conn.receiver : conn.requester,
         connectedAt: conn.updatedAt,
       };
-      return successResponse(
-        res,
-        200,
-        connectedUsers,
-        "Connections fetched successfully",
-      );
     });
+
+    return successResponse(
+      res,
+      200,
+      connectedUsers,
+      "Connections fetched successfully",
+    );
   } catch (error) {
     return errorResponse(res, 500, error.message);
   }
 };
 
-// ── GET /api/v1/connections/pending
-
+// # GET /api/v1/connections/pending
 export const getPendingRequests = async (req, res) => {
   try {
     const pending = await Connection.find({
       receiver: req.userId,
       status: "pending",
-    }).populate("requester", "name profilePhoto college department");
+    })
+      .populate("requester", "name profilePhoto college department")
+      .lean();
 
     return successResponse(res, 200, pending, "Pending requests fetched");
   } catch (error) {
@@ -194,27 +214,44 @@ export const getPendingRequests = async (req, res) => {
   }
 };
 
-// ── GET /api/v1/connections/suggestions
-
+// # GET /api/v1/connections/suggestions
 export const getSuggestions = async (req, res) => {
   try {
-    const currentUser = await User.findById(req.userId);
+    const currentUser = await User.findById(req.userId).lean();
+
     if (!currentUser) {
       return errorResponse(res, 404, "User not found");
     }
 
+    // # Step 1: Get all my connections
     const myConnections = await Connection.find({
       $or: [{ requester: req.userId }, { receiver: req.userId }],
+      status: "accepted",
     });
 
-    const excludeIds = await User.find({
-      _id: { $in: excludeIds },
-    }).populate("college", "name city");
+    // # Step 2: Extract IDs to exclude
+    const excludeIds = new Set();
 
-    // +20 same college
+    excludeIds.add(req.userId.toString());
+
+    myConnections.forEach((conn) => {
+      excludeIds.add(conn.requester.toString());
+      excludeIds.add(conn.receiver.toString());
+    });
+
+    // # Step 3: Get candidates (not in exclude list)
+    const candidate = await User.find({
+      _id: { $nin: Array.from(excludeIds) },
+      isActive: true,
+    })
+      .populate("college", "name city")
+      .lean();
+
+    // # Step 4: Score candidates
     const scored = candidate.map((candidate) => {
       let score = 0;
 
+      // +20 same college
       if (
         currentUser.college &&
         candidate.college &&
@@ -239,6 +276,15 @@ export const getSuggestions = async (req, res) => {
         currentUser.year === candidate.year
       ) {
         score += 5;
+      }
+
+      let sharedSkills = [];
+      
+      if (currentUser.skills && candidate.skills) {
+        sharedSkills = currentUser.skills.filter((skill) =>
+          candidate.skills.includes(skill),
+        );
+        score += sharedSkills.length * 2;
       }
 
       return {

@@ -7,7 +7,7 @@ export const createPost = async (req, res) => {
   try {
     const { content, type, collegeTag, hashTags } = req.body;
 
-    if (!content || !content.trim().length === 0) {
+    if (!content || content.trim().length === 0) {
       return errorResponse(res, 400, "Post content is required");
     }
 
@@ -37,13 +37,22 @@ export const createPost = async (req, res) => {
 // ---- DELETE /api/v1/posts/:id ----
 export const deletePost = async (req, res) => {
   try {
-    const post = await Post.findById(req.params.id);
+    const postId = req.params.id;
+
+    if (!mongoose.Types.ObjectId.isValid(postId)) {
+      return errorResponse(res, 400, "Invalid post ID");
+    }
+
+    const post = await Post.findOne({
+      _id: postId,
+      isActive: true,
+    });
 
     if (!post) {
       return errorResponse(res, 404, "Post not found");
     }
 
-    if (post.author.toString() !== req.userId) {
+    if (!post.author.equals(req.userId)) {
       return errorResponse(res, 403, "Not authorized to delete this post");
     }
 
@@ -65,15 +74,14 @@ export const toggleLike = async (req, res) => {
       return errorResponse(res, 404, "Post not found");
     }
 
-    const alreadyLiked = post.likes
-      .map((id) => id.toString())
-      .includes(req.userId);
+    const alreadyLiked = post.likes.some((id) => id.equals(req.userId));
 
     if (alreadyLiked) {
-      post.likes = post.likes.filter((id) => id.toString() !== req.userId);
+      post.likes.pull(req.userId);
     } else {
-      post.likes.push(req.userId);
+      post.likes.addToSet(req.userId);
     }
+
     await post.save();
 
     // notify post author when someone likes (not when unliking)
@@ -91,8 +99,8 @@ export const toggleLike = async (req, res) => {
       res,
       200,
       {
-        liked: !alreadyLiked, // true if just liked, false if unliked
-        likesCount: post.likes.length, // total likes now
+        liked: !alreadyLiked,
+        likesCount: post.likes.length,
       },
       alreadyLiked ? "Post unliked" : "Post liked",
     );
@@ -105,18 +113,23 @@ export const toggleLike = async (req, res) => {
 export const addComment = async (req, res) => {
   try {
     const { text } = req.body;
+    const postId = req.params.id;
 
     if (!text || text.trim().length === 0) {
       return errorResponse(res, 400, "Comment text is required");
     }
 
-    const post = await Post.findById(req.params.id);
+    if (!mongoose.Types.ObjectId.isValid(postId)) {
+      return errorResponse(res, 400, "Invalid post ID");
+    }
+
+    const post = await Post.findById(postId);
 
     if (!post || !post.isActive) {
       return errorResponse(res, 404, "Post not found");
     }
 
-    post.comment.push({
+    post.comments.push({
       user: req.userId,
       text: text.trim(),
       createdAt: new Date(),
@@ -124,7 +137,6 @@ export const addComment = async (req, res) => {
 
     await post.save();
 
-    // notify post author when someone comments
     if (post.author.toString() !== req.userId) {
       await createNotification({
         recipientId: post.author.toString(),
@@ -138,6 +150,7 @@ export const addComment = async (req, res) => {
     await post.populate("comments.user", "name profilePhoto");
 
     const newComment = post.comments[post.comments.length - 1];
+
     return successResponse(res, 201, newComment, "Comment added");
   } catch (error) {
     return errorResponse(res, 500, error.message);

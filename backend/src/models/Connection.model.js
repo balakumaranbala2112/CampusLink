@@ -2,40 +2,62 @@ import mongoose from "mongoose";
 
 const connectionSchema = new mongoose.Schema(
   {
-    // who sent the request
     requester: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
+      index: true,
     },
 
-    // who received the request
     receiver: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
+      index: true,
     },
 
-    // current state
+    participants: {
+      type: [mongoose.Schema.Types.ObjectId],
+      required: true,
+      validate: {
+        validator: (arr) => arr.length === 2,
+        message: "Participants must contain exactly 2 users",
+      },
+    },
+
     status: {
       type: String,
-      enum: ["pending", "accepted", "declined"],
+      enum: ["pending", "accepted", "declined", "blocked"],
       default: "pending",
+      index: true,
+    },
+
+    isActive: {
+      type: Boolean,
+      default: true,
     },
   },
-  {
-    timestamps: true,
-  },
+  { timestamps: true },
 );
 
-// ── Indexes 
-connectionSchema.index({ requester: 1 });
-connectionSchema.index({ receiver: 1 });
-connectionSchema.index({ status: 1 });
+// 🔥 INDEXES
+connectionSchema.index({ participants: 1 }, { unique: true });
+connectionSchema.index({ participants: 1, status: 1 });
+connectionSchema.index({ receiver: 1, status: 1 });
+connectionSchema.index({ requester: 1, status: 1 });
 
-// ── Prevent duplicate requests
-// A→B can only exist once
-connectionSchema.index({ requester: 1, receiver: 1 }, { unique: true });
+// 🔥 PRE-HOOK
+connectionSchema.pre("validate", function (next) {
+  if (this.requester.equals(this.receiver)) {
+    return next(new Error("Cannot connect with yourself"));
+  }
+
+  const sorted = [this.requester.toString(), this.receiver.toString()].sort();
+
+  this.participants = sorted;
+
+  next();
+});
 
 export default mongoose.models.Connection ||
   mongoose.model("Connection", connectionSchema);

@@ -11,11 +11,10 @@ export const getMessageHistory = async (req, res) => {
 
     // Step 1 — security check
 
+    const participants = [myId, otherUserId].sort();
+
     const connection = await Connection.findOne({
-      $or: [
-        { requester: myId, receiver: otherUserId },
-        { requester: otherUserId, receiver: myId },
-      ],
+      participants,
       status: "accepted",
     });
 
@@ -53,7 +52,6 @@ export const getMessageHistory = async (req, res) => {
 };
 
 // ── GET /api/v1/messages/conversations ───────
-
 export const getConversations = async (req, res) => {
   try {
     const myId = new mongoose.Types.ObjectId(req.userId);

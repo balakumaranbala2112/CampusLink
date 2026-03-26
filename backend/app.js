@@ -11,7 +11,7 @@ import uploadRoutes from "./src/routes/upload.routes.js";
 import messageRoutes from "./src/routes/message.routes.js";
 import groupRoutes from "./src/routes/group.routes.js";
 import notificationRoutes from "./src/routes/notification.routes.js";
-import safetyRoutes from "./src/routes/safety.routes.js";
+import safetyRoutes from "./src/routes/safety.routes.js"; 
 
 const app = express();
 

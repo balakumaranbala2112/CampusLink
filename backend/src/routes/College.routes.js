@@ -3,7 +3,7 @@ import {
   createCollege,
   getAllColleges,
   getCollegeById,
-} from "../controllers/College.controller.js";
+} from "../controllers/college.controller.js";
 
 const router = express.Router();
 

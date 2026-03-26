@@ -37,10 +37,9 @@ const collegeSchema = new mongoose.Schema(
   },
 );
 
-// ── Index for faster search ──────────────────
+// ---- Index for faster search
 collegeSchema.index({ city: 1 });
 collegeSchema.index({ state: 1 });
 
-// ✅ Fix — check if model exists before creating
 export default mongoose.models.College ||
   mongoose.model("College", collegeSchema);

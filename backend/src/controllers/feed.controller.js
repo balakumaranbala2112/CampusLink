@@ -7,7 +7,7 @@ import { successResponse, errorResponse } from "../utils/apiResponse.js";
 // ---- GET /api/v1/feed ----
 export const getFeed = async (req, res) => {
   try {
-    // GET /api/v1/feed?page=1&limit=10
+    
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
@@ -76,16 +76,12 @@ export const getFeed = async (req, res) => {
       .sort({ createdAt: -1 })
       .limit(10);
 
-    const allPosts = [
-      ...connectionPosts, // spread = unpack array items
-      ...collegePosts,
-      ...trendingPosts,
-    ];
+    const allPosts = [...connectionPosts, ...collegePosts, ...trendingPosts];
 
     const seen = new Set();
     const uniqueFeed = allPosts.filter((post) => {
       const id = post._id.toString();
-      if (seen.has(id)) return false; // duplicate → remove
+      if (seen.has(id)) return false;
       seen.add(id);
       return true;
     });
