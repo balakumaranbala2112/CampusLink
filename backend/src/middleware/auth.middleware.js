@@ -1,7 +1,8 @@
 import { verifyAccessToken } from "../utils/jwt.utils.js";
 import { errorResponse } from "../utils/apiResponse.js";
+import { redis } from "../config/redis.js";
 
-const authMiddleware = (req, res, next) => {
+const authMiddleware = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
 
@@ -11,6 +12,12 @@ const authMiddleware = (req, res, next) => {
 
     const token = authHeader.split(" ")[1];
     const decoded = verifyAccessToken(token);
+    console.log(decoded);
+
+    const isBlacklisted = await redis.get(`blacklist:${token}`);
+    if (isBlacklisted) {
+      return errorResponse(res, 401, "Token invalid");
+    }
 
     req.userId = decoded.userId;
 
